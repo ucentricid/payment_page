@@ -107,16 +107,12 @@ function PaymentContent() {
                         icon: 'info',
                         title: 'Menunggu Pembayaran',
                         text: 'Silakan selesaikan pembayaran Anda.',
-                        title: 'Menunggu Pembayaran',
-                        text: 'Silakan selesaikan pembayaran Anda.',
                         confirmButtonColor: '#1D61E7'
                     });
                 },
                 onError: function (result: any) {
                     MySwal.fire({
                         icon: 'error',
-                        title: 'Pembayaran Gagal',
-                        text: 'Terjadi kesalahan saat memproses pembayaran.',
                         title: 'Pembayaran Gagal',
                         text: 'Terjadi kesalahan saat memproses pembayaran.',
                         confirmButtonColor: '#ef4444'
