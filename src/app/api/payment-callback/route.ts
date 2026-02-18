@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import midtransClient from 'midtrans-client';
 import { query } from '@/lib/db';
+import { sendReceiptEmail } from '@/lib/mail';
 
 const isProduction = !process.env.MIDTRANS_SERVER_KEY?.startsWith('SB-');
 
@@ -68,6 +69,9 @@ export async function POST(req: Request) {
                 );
 
                 console.log(`Token generated for ${orderId}: ${tokenNumber} (Ref: ${referral_code})`);
+
+                // 4. Send Receipt Email
+                await sendReceiptEmail(email, name, orderId, tokenNumber);
             }
         }
 

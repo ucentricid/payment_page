@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import midtransClient from 'midtrans-client';
 import { query } from '@/lib/db';
+import { sendReceiptEmail } from '@/lib/mail';
 
 const isProduction = !process.env.MIDTRANS_SERVER_KEY?.startsWith('SB-');
 
@@ -59,6 +60,9 @@ export async function GET(req: Request) {
                          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
                         [orderId, name, email, phone, tokenNumber, new Date(), true, referral_code]
                     );
+
+                    // Send Receipt Email (Fallback)
+                    await sendReceiptEmail(email, name, orderId, tokenNumber);
                 }
             }
         }

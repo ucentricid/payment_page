@@ -77,15 +77,15 @@ function PaymentContent() {
                         MySwal.fire({
                             icon: 'success',
                             title: 'Pembayaran Berhasil!',
-                            text: 'Mengarahkan ke halaman resi...',
+                            text: 'Pembayaran berhasil, kembali ke halaman utama...',
                             confirmButtonColor: '#1D61E7',
                             timer: 2000,
                             showConfirmButton: false,
                         }).then(() => {
-                            router.push(`/receipt?orderId=${orderId}`);
+                            router.push('/');
                         });
                     } else {
-                        router.push(`/receipt?orderId=${orderId}`);
+                        router.push('/');
                     }
                 }
             }
