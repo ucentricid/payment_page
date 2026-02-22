@@ -1,16 +1,19 @@
 'use client';
 
 import { Suspense, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { User, Mail, Phone, ArrowRight } from 'lucide-react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { User, Mail, Phone, ArrowRight, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 
 const MySwal = withReactContent(Swal);
 
 function Step1Content() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const referralCode = searchParams.get('ref') || '';
+  const orderId = searchParams.get('order_id');
+  const transactionStatus = searchParams.get('transaction_status');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -18,6 +21,69 @@ function Step1Content() {
     phone: '',
   });
   const [loading, setLoading] = useState(false);
+
+  // If redirect query params are present, show status UI instead of form
+  if (orderId && transactionStatus) {
+    const isSuccess = transactionStatus === 'settlement' || transactionStatus === 'capture';
+    const isPending = transactionStatus === 'pending';
+    const isFailed = transactionStatus === 'cancel' || transactionStatus === 'deny' || transactionStatus === 'expire';
+
+    return (
+      <main>
+        <div className="container">
+          <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+            <div className="badge">Status Pembayaran</div>
+            <h1>{isSuccess ? 'Pembayaran Berhasil' : isPending ? 'Menunggu Pembayaran' : isFailed ? 'Pembayaran Gagal' : 'Status Tidak Diketahui'}</h1>
+          </div>
+
+          <div className="card" style={{ textAlign: 'center', padding: '40px 20px' }}>
+            {isSuccess && (
+              <>
+                <CheckCircle2 color="#10b981" size={80} style={{ margin: '0 auto 20px auto' }} />
+                <h2 style={{ fontSize: '24px', marginBottom: '10px' }}>Terima Kasih!</h2>
+                <p style={{ color: '#64748b', marginBottom: '20px' }}>
+                  Pembayaran Anda untuk Order <strong>{orderId}</strong> telah berhasil kami terima. Silakan cek email Anda untuk informasi lebih lanjut.
+                </p>
+              </>
+            )}
+
+            {isPending && (
+              <>
+                <Clock color="#f59e0b" size={80} style={{ margin: '0 auto 20px auto' }} />
+                <h2 style={{ fontSize: '24px', marginBottom: '10px' }}>Menunggu Pembayaran</h2>
+                <p style={{ color: '#64748b', marginBottom: '20px' }}>
+                  Pesanan <strong>{orderId}</strong> sedang menunggu pembayaran. Silakan selesaikan instruksi pembayaran yang dikirim ke email Anda.
+                </p>
+              </>
+            )}
+
+            {isFailed && (
+              <>
+                <XCircle color="#ef4444" size={80} style={{ margin: '0 auto 20px auto' }} />
+                <h2 style={{ fontSize: '24px', marginBottom: '10px' }}>Pembayaran Gagal</h2>
+                <p style={{ color: '#64748b', marginBottom: '20px' }}>
+                  Mohon maaf, pembayaran untuk Order <strong>{orderId}</strong> tidak dapat diproses atau telah kedaluwarsa.
+                </p>
+              </>
+            )}
+
+            {(!isSuccess && !isPending && !isFailed) && (
+              <p style={{ color: '#64748b', marginBottom: '20px' }}>
+                Status transaksi: {transactionStatus} (Order ID: {orderId})
+              </p>
+            )}
+
+            <button
+              onClick={() => router.push('/')}
+              style={{ marginTop: '20px', maxWidth: '300px', margin: '0 auto', display: 'flex', justifyContent: 'center' }}
+            >
+              Kembali ke Beranda
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
