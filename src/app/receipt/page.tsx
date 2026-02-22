@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { CheckCircle2, Copy, Download, Home, Mail, Phone, User, Zap, ShieldCheck, FileText } from 'lucide-react';
+import { CheckCircle2, Copy, Download, Home, Zap, ShieldCheck } from 'lucide-react';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 
@@ -12,7 +12,7 @@ function ReceiptContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const orderId = searchParams.get('orderId');
-    const [data, setData] = useState<any>(null);
+    const [data, setData] = useState<Record<string, string> | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {

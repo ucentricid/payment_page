@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { User, Mail, Phone, ArrowRight } from 'lucide-react';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
@@ -9,7 +9,6 @@ import withReactContent from 'sweetalert2-react-content';
 const MySwal = withReactContent(Swal);
 
 function Step1Content() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const referralCode = searchParams.get('ref') || '';
 
@@ -37,13 +36,41 @@ function Step1Content() {
     }
 
     try {
-      const params = new URLSearchParams({
-        ...formData,
-        ref: referralCode
+      const response = await fetch('/api/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...formData,
+          referralCode,
+        }),
       });
-      router.push(`/payment?${params.toString()}`);
-    } catch (error) {
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Terjadi kesalahan saat pendaftaran.');
+      }
+
+      MySwal.fire({
+        icon: 'success',
+        title: 'Registrasi Berhasil!',
+        text: 'Silakan cek email Anda (termasuk folder spam) untuk melanjutkan ke pembayaran.',
+        confirmButtonColor: '#1D61E7'
+      });
+
+      setFormData({ name: '', email: '', phone: '' });
+      setLoading(false);
+    } catch (error: unknown) {
       console.error(error);
+      const message = error instanceof Error ? error.message : 'Terjadi kesalahan koneksi';
+      MySwal.fire({
+        icon: 'error',
+        title: 'Gagal Pendaftaran',
+        text: message,
+        confirmButtonColor: '#1D61E7'
+      });
       setLoading(false);
     }
   };
@@ -106,7 +133,7 @@ function Step1Content() {
 
             <div style={{ marginTop: '32px' }}>
               <button type="submit" disabled={loading}>
-                {loading ? 'Memproses...' : 'Lanjutkan ke Pembayaran'}
+                {loading ? 'Memproses...' : 'Daftar Sekarang'}
                 {!loading && <ArrowRight size={18} />}
               </button>
             </div>

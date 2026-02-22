@@ -31,7 +31,7 @@ export async function GET(req: Request) {
                 code: user.referral_code
             }
         });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Validate Referral Error:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }

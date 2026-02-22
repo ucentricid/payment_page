@@ -48,7 +48,8 @@ function PaymentContent() {
                 } else {
                     setError(data.error || 'Gagal mendapatkan token pembayaran');
                 }
-            } catch (err) {
+            } catch (err: unknown) {
+                console.error(err);
                 setError('Terjadi kesalahan koneksi');
             } finally {
                 setLoading(false);
@@ -56,7 +57,7 @@ function PaymentContent() {
         };
 
         getToken();
-    }, [name, email, phone, router]);
+    }, [name, email, phone, referralCode, router]);
 
     const checkStatus = async (silent = false) => {
         if (!orderId) return;
@@ -97,12 +98,16 @@ function PaymentContent() {
     };
 
     const handlePayment = () => {
-        if (token && (window as any).snap) {
-            (window as any).snap.pay(token, {
-                onSuccess: function (result: any) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const win = window as any;
+        if (token && win.snap) {
+            win.snap.pay(token, {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
+                onSuccess: function (_result: any) {
                     checkStatus();
                 },
-                onPending: function (result: any) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
+                onPending: function (_result: any) {
                     MySwal.fire({
                         icon: 'info',
                         title: 'Menunggu Pembayaran',
@@ -110,7 +115,8 @@ function PaymentContent() {
                         confirmButtonColor: '#1D61E7'
                     });
                 },
-                onError: function (result: any) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
+                onError: function (_result: any) {
                     MySwal.fire({
                         icon: 'error',
                         title: 'Pembayaran Gagal',

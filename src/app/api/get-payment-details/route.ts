@@ -20,8 +20,9 @@ export async function GET(req: Request) {
         }
 
         return NextResponse.json(result.rows[0]);
-    } catch (error: any) {
-        console.error('Fetch Details Error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error: unknown) {
+        console.error('Get Payment Details Error:', error);
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }

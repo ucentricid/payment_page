@@ -1,18 +1,16 @@
 import { NextResponse } from 'next/server';
 import midtransClient from 'midtrans-client';
 import { query } from '@/lib/db';
-
-// Move initialization inside to ensure env vars are loaded
+import { sendPaymentLinkEmail } from '@/lib/mail';
 
 export async function POST(req: Request) {
     const serverKey = process.env.MIDTRANS_SERVER_KEY?.trim();
     const clientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY?.trim();
     const isProduction = !serverKey?.startsWith('SB-');
 
-    console.log('--- Midtrans Debug ---');
+    console.log('--- Register Flow - Midtrans Debug ---');
     console.log('Server Key exists:', !!serverKey);
     console.log('Client Key exists:', !!clientKey);
-    console.log('Server Key Prefix:', serverKey?.substring(0, 11));
     console.log('Detected isProduction:', isProduction);
 
     const snap = new midtransClient.Snap({
@@ -29,7 +27,7 @@ export async function POST(req: Request) {
         }
 
         const orderId = `MITRA-${Date.now()}`;
-        const amount = 100;
+        const amount = 100; // IDR
 
         // 1. Create Midtrans Transaction
         const parameter = {
@@ -52,6 +50,7 @@ export async function POST(req: Request) {
 
         const transaction = await snap.createTransaction(parameter);
         const snapToken = transaction.token;
+        const redirectUrl = transaction.redirect_url; // payment URL
 
         // 2. Save to Database
         await query(
@@ -60,9 +59,12 @@ export async function POST(req: Request) {
             [orderId, name, email, phone, amount, 'pending', snapToken, referralCode || null]
         );
 
-        return NextResponse.json({ token: snapToken, orderId });
+        // 3. Send Email with Payment Link
+        await sendPaymentLinkEmail(email, name, orderId, redirectUrl, amount.toString());
+
+        return NextResponse.json({ success: true, message: 'Registrasi berhasil. Link pembayaran telah dikirim ke email.' });
     } catch (error: unknown) {
-        console.error('Midtrans Error:', error);
+        console.error('Registration Error:', error);
         const message = error instanceof Error ? error.message : 'Unknown error';
         return NextResponse.json({ error: message }, { status: 500 });
     }
