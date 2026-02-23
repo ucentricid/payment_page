@@ -20,6 +20,7 @@ function Step1Content() {
     email: '',
     phone: '',
   });
+  const [hasConsent, setHasConsent] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // If redirect query params are present, show status UI instead of form
@@ -101,6 +102,17 @@ function Step1Content() {
       return;
     }
 
+    if (!hasConsent) {
+      MySwal.fire({
+        icon: 'warning',
+        title: 'Persetujuan Diperlukan',
+        text: 'Anda harus menyetujui Kebijakan Privasi kami untuk melanjutkan pendaftaran.',
+        confirmButtonColor: '#1D61E7'
+      });
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch('/api/register', {
         method: 'POST',
@@ -127,6 +139,7 @@ function Step1Content() {
       });
 
       setFormData({ name: '', email: '', phone: '' });
+      setHasConsent(false);
       setLoading(false);
     } catch (error: unknown) {
       console.error(error);
@@ -197,8 +210,22 @@ function Step1Content() {
               </div>
             </div>
 
+            <div style={{ marginTop: '24px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+              <input
+                type="checkbox"
+                id="consent"
+                checked={hasConsent}
+                onChange={(e) => setHasConsent(e.target.checked)}
+                style={{ marginTop: '4px', cursor: 'pointer', width: '16px', height: '16px' }}
+                required
+              />
+              <label htmlFor="consent" style={{ fontSize: '14px', color: '#64748b', lineHeight: '1.5', cursor: 'pointer', fontWeight: 'normal', marginBottom: 0 }}>
+                Saya menyetujui Syarat & Ketentuan serta <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" style={{ color: '#1D61E7', textDecoration: 'underline' }}>Kebijakan Privasi</a> yang berlaku untuk pelindungan data saya.
+              </label>
+            </div>
+
             <div style={{ marginTop: '32px' }}>
-              <button type="submit" disabled={loading}>
+              <button type="submit" disabled={loading || !hasConsent}>
                 {loading ? 'Memproses...' : 'Daftar Sekarang'}
                 {!loading && <ArrowRight size={18} />}
               </button>
@@ -207,7 +234,8 @@ function Step1Content() {
         </div>
 
         <div className="footer-info">
-          © 2026 Mitra. Pembayaran aman melalui Midtrans.
+          © 2026 Mitra. Pembayaran aman melalui Midtrans.<br />
+          <a href="/privacy-policy" style={{ color: '#94a3b8', textDecoration: 'underline', marginTop: '8px', display: 'inline-block' }}>Kebijakan Privasi (UU PDP)</a>
         </div>
       </div>
     </main>

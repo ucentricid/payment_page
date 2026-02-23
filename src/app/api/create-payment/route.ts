@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import midtransClient from 'midtrans-client';
-import { query } from '@/lib/db';
+import prisma from '@/lib/prisma';
 
 // Move initialization inside to ensure env vars are loaded
 
@@ -54,11 +54,19 @@ export async function POST(req: Request) {
         const snapToken = transaction.token;
 
         // 2. Save to Database
-        await query(
-            `INSERT INTO payments (order_id, name, email, phone, amount, status, midtrans_token, referral_code)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-            [orderId, name, email, phone, amount, 'pending', snapToken, referralCode || null]
-        );
+        await prisma.payments.create({
+            data: {
+                order_id: orderId,
+                name,
+                email,
+                phone,
+                amount,
+                status: 'pending',
+                midtrans_token: snapToken,
+                referral_code: referralCode || null,
+                privacy_policy_accepted_at: new Date(),
+            }
+        });
 
         return NextResponse.json({ token: snapToken, orderId });
     } catch (error: unknown) {

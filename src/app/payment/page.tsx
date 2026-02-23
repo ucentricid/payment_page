@@ -241,7 +241,8 @@ function PaymentContent() {
                 </div>
 
                 <div className="footer-info">
-                    © 2026 Mitra. Pembayaran terenkripsi.
+                    © 2026 Mitra. Pembayaran terenkripsi.<br />
+                    <a href="/privacy-policy" style={{ color: '#94a3b8', textDecoration: 'underline', marginTop: '8px', display: 'inline-block' }}>Kebijakan Privasi (UU PDP)</a>
                 </div>
             </div>
             <style jsx>{`
