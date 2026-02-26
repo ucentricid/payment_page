@@ -1,19 +1,19 @@
 import { NextResponse } from 'next/server';
 import midtransClient from 'midtrans-client';
 import prisma from '@/lib/prisma';
+import { withBetterStack, BetterStackRequest } from '@logtail/next';
 
-// Move initialization inside to ensure env vars are loaded
-
-export async function POST(req: Request) {
+export const POST = withBetterStack(async (req: BetterStackRequest) => {
+    const log = req.log.with({ route: 'create-payment' });
     const serverKey = process.env.MIDTRANS_SERVER_KEY?.trim();
     const clientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY?.trim();
     const isProduction = !serverKey?.startsWith('SB-');
 
-    console.log('--- Midtrans Debug ---');
-    console.log('Server Key exists:', !!serverKey);
-    console.log('Client Key exists:', !!clientKey);
-    console.log('Server Key Prefix:', serverKey?.substring(0, 11));
-    console.log('Detected isProduction:', isProduction);
+    log.info('Create payment request received', {
+        serverKeyExists: !!serverKey,
+        clientKeyExists: !!clientKey,
+        isProduction,
+    });
 
     const snap = new midtransClient.Snap({
         isProduction,
@@ -25,6 +25,7 @@ export async function POST(req: Request) {
         const { name, email, phone, referralCode } = await req.json();
 
         if (!name || !email || !phone) {
+            log.warn('Missing required fields', { name: !!name, email: !!email, phone: !!phone });
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
@@ -68,10 +69,11 @@ export async function POST(req: Request) {
             }
         });
 
+        log.info('Payment created successfully', { orderId, email });
         return NextResponse.json({ token: snapToken, orderId });
     } catch (error: unknown) {
-        console.error('Midtrans Error:', error);
         const message = error instanceof Error ? error.message : 'Unknown error';
+        log.error('Failed to create payment', { error: message });
         return NextResponse.json({ error: message }, { status: 500 });
     }
-}
+});

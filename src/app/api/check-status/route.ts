@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import midtransClient from 'midtrans-client';
 import { query } from '@/lib/db';
 import { sendReceiptEmail } from '@/lib/mail';
+import { withBetterStack, BetterStackRequest } from '@logtail/next';
 
 const isProduction = !process.env.MIDTRANS_SERVER_KEY?.startsWith('SB-');
 
@@ -11,7 +12,8 @@ const snap = new midtransClient.Snap({
     clientKey: process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY,
 });
 
-export async function GET(req: Request) {
+export const GET = withBetterStack(async (req: BetterStackRequest) => {
+    const log = req.log.with({ route: 'check-status' });
     const { searchParams } = new URL(req.url);
     const orderId = searchParams.get('orderId');
 
@@ -20,6 +22,8 @@ export async function GET(req: Request) {
     }
 
     try {
+        log.info('Checking payment status', { orderId });
+
         // 1. Check status from Midtrans
         const midtransStatus = await snap.transaction.status(orderId);
         const transactionStatus = midtransStatus.transaction_status;
@@ -34,6 +38,8 @@ export async function GET(req: Request) {
         } else if (transactionStatus === 'cancel' || transactionStatus === 'deny' || transactionStatus === 'expire') {
             finalStatus = 'failure';
         }
+
+        log.info('Midtrans status fetched', { orderId, transactionStatus, fraudStatus, finalStatus });
 
         // 2. Update DB based on Midtrans status
         await query(
@@ -61,6 +67,8 @@ export async function GET(req: Request) {
                         [orderId, name, email, phone, tokenNumber, new Date(), true, referral_code]
                     );
 
+                    log.info('Token generated (fallback path)', { orderId, tokenNumber });
+
                     // Send Receipt Email (Fallback)
                     await sendReceiptEmail(email, name, orderId, tokenNumber);
                 }
@@ -78,8 +86,8 @@ export async function GET(req: Request) {
         });
 
     } catch (error: unknown) {
-        console.error('Status Check Error:', error);
         const message = error instanceof Error ? error.message : 'Unknown error';
+        log.error('Status check failed', { orderId, error: message });
         return NextResponse.json({ error: message }, { status: 500 });
     }
-}
+});

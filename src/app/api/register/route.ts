@@ -2,16 +2,19 @@ import { NextResponse } from 'next/server';
 import midtransClient from 'midtrans-client';
 import prisma from '@/lib/prisma';
 import { sendPaymentLinkEmail } from '@/lib/mail';
+import { withBetterStack, BetterStackRequest } from '@logtail/next';
 
-export async function POST(req: Request) {
+export const POST = withBetterStack(async (req: BetterStackRequest) => {
+    const log = req.log.with({ route: 'register' });
     const serverKey = process.env.MIDTRANS_SERVER_KEY?.trim();
     const clientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY?.trim();
     const isProduction = !serverKey?.startsWith('SB-');
 
-    console.log('--- Register Flow - Midtrans Debug ---');
-    console.log('Server Key exists:', !!serverKey);
-    console.log('Client Key exists:', !!clientKey);
-    console.log('Detected isProduction:', isProduction);
+    log.info('Register request received', {
+        serverKeyExists: !!serverKey,
+        clientKeyExists: !!clientKey,
+        isProduction,
+    });
 
     const snap = new midtransClient.Snap({
         isProduction,
@@ -23,6 +26,7 @@ export async function POST(req: Request) {
         const { name, email, phone, referralCode } = await req.json();
 
         if (!name || !email || !phone) {
+            log.warn('Missing required fields', { name: !!name, email: !!email, phone: !!phone });
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
@@ -70,10 +74,11 @@ export async function POST(req: Request) {
         // 3. Send Email with Payment Link
         await sendPaymentLinkEmail(email, name, orderId, redirectUrl, amount.toString());
 
+        log.info('Registration successful, payment email sent', { orderId, email });
         return NextResponse.json({ success: true, message: 'Registrasi berhasil. Link pembayaran telah dikirim ke email.' });
     } catch (error: unknown) {
-        console.error('Registration Error:', error);
         const message = error instanceof Error ? error.message : 'Unknown error';
+        log.error('Registration failed', { error: message });
         return NextResponse.json({ error: message }, { status: 500 });
     }
-}
+});
