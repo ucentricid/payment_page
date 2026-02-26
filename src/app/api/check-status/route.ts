@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import midtransClient from 'midtrans-client';
 import { query } from '@/lib/db';
 import { sendReceiptEmail } from '@/lib/mail';
-import { withBetterStack, BetterStackRequest } from '@logtail/next';
+import * as Sentry from '@sentry/nextjs';
 
 const isProduction = !process.env.MIDTRANS_SERVER_KEY?.startsWith('SB-');
 
@@ -12,8 +12,7 @@ const snap = new midtransClient.Snap({
     clientKey: process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY,
 });
 
-export const GET = withBetterStack(async (req: BetterStackRequest) => {
-    const log = req.log.with({ route: 'check-status' });
+export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const orderId = searchParams.get('orderId');
 
@@ -22,9 +21,6 @@ export const GET = withBetterStack(async (req: BetterStackRequest) => {
     }
 
     try {
-        log.info('Checking payment status', { orderId });
-
-        // 1. Check status from Midtrans
         const midtransStatus = await snap.transaction.status(orderId);
         const transactionStatus = midtransStatus.transaction_status;
         const fraudStatus = midtransStatus.fraud_status;
@@ -39,15 +35,11 @@ export const GET = withBetterStack(async (req: BetterStackRequest) => {
             finalStatus = 'failure';
         }
 
-        log.info('Midtrans status fetched', { orderId, transactionStatus, fraudStatus, finalStatus });
-
-        // 2. Update DB based on Midtrans status
         await query(
             'UPDATE payments SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE order_id = $2',
             [finalStatus, orderId]
         );
 
-        // 3. If successful, check if token exists, if not generate it (Safety measure)
         if (finalStatus === 'success') {
             const tokenCheck = await query('SELECT token_number FROM ukasir_token WHERE order_id = $1', [orderId]);
 
@@ -67,15 +59,11 @@ export const GET = withBetterStack(async (req: BetterStackRequest) => {
                         [orderId, name, email, phone, tokenNumber, new Date(), true, referral_code]
                     );
 
-                    log.info('Token generated (fallback path)', { orderId, tokenNumber });
-
-                    // Send Receipt Email (Fallback)
                     await sendReceiptEmail(email, name, orderId, tokenNumber);
                 }
             }
         }
 
-        // 4. Get latest data from DB
         const result = await query('SELECT status FROM payments WHERE order_id = $1', [orderId]);
         const tokenResult = await query('SELECT token_number FROM ukasir_token WHERE order_id = $1', [orderId]);
 
@@ -86,8 +74,8 @@ export const GET = withBetterStack(async (req: BetterStackRequest) => {
         });
 
     } catch (error: unknown) {
+        Sentry.captureException(error);
         const message = error instanceof Error ? error.message : 'Unknown error';
-        log.error('Status check failed', { orderId, error: message });
         return NextResponse.json({ error: message }, { status: 500 });
     }
-});
+}

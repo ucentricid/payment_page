@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import midtransClient from 'midtrans-client';
 import { query } from '@/lib/db';
 import { sendReceiptEmail } from '@/lib/mail';
-import { withBetterStack, BetterStackRequest } from '@logtail/next';
+import * as Sentry from '@sentry/nextjs';
 
 const isProduction = !process.env.MIDTRANS_SERVER_KEY?.startsWith('SB-');
 
@@ -12,12 +12,9 @@ const snap = new midtransClient.Snap({
     clientKey: process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY,
 });
 
-export const POST = withBetterStack(async (req: BetterStackRequest) => {
-    const log = req.log.with({ route: 'payment-callback' });
-
+export async function POST(req: Request) {
     try {
         const notification = await req.json();
-        log.info('Payment callback received', { orderId: notification.order_id });
 
         const statusResponse = await snap.transaction.notification(notification);
         const orderId = statusResponse.order_id;
@@ -40,8 +37,6 @@ export const POST = withBetterStack(async (req: BetterStackRequest) => {
             finalStatus = 'pending';
         }
 
-        log.info('Payment status resolved', { orderId, transactionStatus, fraudStatus, finalStatus });
-
         // Update the database
         await query(
             'UPDATE payments SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE order_id = $2',
@@ -50,13 +45,11 @@ export const POST = withBetterStack(async (req: BetterStackRequest) => {
 
         // If payment is successful, generate and insert token into digital token table
         if (finalStatus === 'success') {
-            // 1. Get user details and referral code from payments table
             const paymentResult = await query('SELECT name, email, phone, referral_code FROM payments WHERE order_id = $1', [orderId]);
 
             if (paymentResult.rows.length > 0) {
                 const { name, email, phone, referral_code } = paymentResult.rows[0];
 
-                // 2. Generate token (xxxx-xxxx-xxxx-xxxx)
                 const generateToken = () => {
                     const chars = '0123456789';
                     const chunk = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
@@ -64,9 +57,8 @@ export const POST = withBetterStack(async (req: BetterStackRequest) => {
                 };
 
                 const tokenNumber = generateToken();
-                const registerDate = new Date(); // Current date/time
+                const registerDate = new Date();
 
-                // 3. Insert into ukasir_token
                 await query(
                     `INSERT INTO ukasir_token (
                         order_id, name, email, phone, token_number, register_date, status_active, referral_code
@@ -74,17 +66,16 @@ export const POST = withBetterStack(async (req: BetterStackRequest) => {
                     [orderId, name, email, phone, tokenNumber, registerDate, true, referral_code]
                 );
 
-                log.info('Token generated for successful payment', { orderId, tokenNumber, referralCode: referral_code });
+                console.log(`Token generated for ${orderId}: ${tokenNumber} (Ref: ${referral_code})`);
 
-                // 4. Send Receipt Email
                 await sendReceiptEmail(email, name, orderId, tokenNumber);
             }
         }
 
         return NextResponse.json({ status: 'ok' });
     } catch (error: unknown) {
+        Sentry.captureException(error);
         const message = error instanceof Error ? error.message : 'Unknown error';
-        log.error('Payment callback processing failed', { error: message });
         return NextResponse.json({ error: message }, { status: 500 });
     }
-});
+}

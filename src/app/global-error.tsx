@@ -1,9 +1,7 @@
 "use client";
 
+import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
-import { useLogger } from "@logtail/next/hooks";
-import { LogLevel } from "@logtail/next";
-import { usePathname } from "next/navigation";
 
 export default function GlobalError({
     error,
@@ -12,27 +10,9 @@ export default function GlobalError({
     error: Error & { digest?: string };
     reset: () => void;
 }) {
-    const pathname = usePathname();
-    const log = useLogger({ source: "error-boundary" });
-
     useEffect(() => {
-        const statusCode = error.message === "Invalid URL" ? 404 : 500;
-        log.logHttpRequest(
-            LogLevel.error,
-            error.message,
-            {
-                host: window.location.href,
-                path: pathname,
-                statusCode,
-            },
-            {
-                error: error.name,
-                cause: String(error.cause ?? ""),
-                stack: error.stack,
-                digest: error.digest,
-            }
-        );
-    }, [error, log, pathname]);
+        Sentry.captureException(error);
+    }, [error]);
 
     return (
         <html>

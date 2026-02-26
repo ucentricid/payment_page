@@ -1,19 +1,12 @@
 import { NextResponse } from 'next/server';
 import midtransClient from 'midtrans-client';
 import prisma from '@/lib/prisma';
-import { withBetterStack, BetterStackRequest } from '@logtail/next';
+import * as Sentry from '@sentry/nextjs';
 
-export const POST = withBetterStack(async (req: BetterStackRequest) => {
-    const log = req.log.with({ route: 'create-payment' });
+export async function POST(req: Request) {
     const serverKey = process.env.MIDTRANS_SERVER_KEY?.trim();
     const clientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY?.trim();
     const isProduction = !serverKey?.startsWith('SB-');
-
-    log.info('Create payment request received', {
-        serverKeyExists: !!serverKey,
-        clientKeyExists: !!clientKey,
-        isProduction,
-    });
 
     const snap = new midtransClient.Snap({
         isProduction,
@@ -25,14 +18,12 @@ export const POST = withBetterStack(async (req: BetterStackRequest) => {
         const { name, email, phone, referralCode } = await req.json();
 
         if (!name || !email || !phone) {
-            log.warn('Missing required fields', { name: !!name, email: !!email, phone: !!phone });
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
         const orderId = `MITRA-${Date.now()}`;
         const amount = 100;
 
-        // 1. Create Midtrans Transaction
         const parameter = {
             transaction_details: {
                 order_id: orderId,
@@ -54,7 +45,6 @@ export const POST = withBetterStack(async (req: BetterStackRequest) => {
         const transaction = await snap.createTransaction(parameter);
         const snapToken = transaction.token;
 
-        // 2. Save to Database
         await prisma.payments.create({
             data: {
                 order_id: orderId,
@@ -69,11 +59,10 @@ export const POST = withBetterStack(async (req: BetterStackRequest) => {
             }
         });
 
-        log.info('Payment created successfully', { orderId, email });
         return NextResponse.json({ token: snapToken, orderId });
     } catch (error: unknown) {
+        Sentry.captureException(error);
         const message = error instanceof Error ? error.message : 'Unknown error';
-        log.error('Failed to create payment', { error: message });
         return NextResponse.json({ error: message }, { status: 500 });
     }
-});
+}
